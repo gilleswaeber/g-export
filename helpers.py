@@ -1,6 +1,8 @@
 import gzip
 import json
 import shutil
+from gzip import GzipFile
+from io import TextIOWrapper
 from os import getpid
 from pathlib import Path
 from sys import stderr
@@ -35,9 +37,11 @@ def read_json_gz_file(file):
         return json.load(f)
 
 
-def write_json_gz_file(file, contents):
-    with TmpFile(file) as tmp, gzip.open(tmp, mode='wt', encoding='utf-8') as f:
-        json.dump(contents, f)
+def write_json_gz_file(file: Path, contents):
+    with TmpFile(file) as tmp, tmp.open(mode='wb') as fh,\
+            GzipFile(file.name.removesuffix('.gz'), fileobj=fh, mode='wb') as fg,\
+            TextIOWrapper(fg, encoding='utf-8') as ft:
+        json.dump(contents, ft)
 
 
 def one_way_sync(src: Path, dest: Path, files: Iterable[Path]):
@@ -46,6 +50,7 @@ def one_way_sync(src: Path, dest: Path, files: Iterable[Path]):
     for f in in_dest - files:
         (dest / f).unlink()
     for f in files - in_dest:
+        (dest / f).parent.mkdir(parents=True, exist_ok=True)
         if (src / f).is_file():
             shutil.copy(src / f, dest / f)
         else:

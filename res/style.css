@@ -1,4 +1,4 @@
-.ag-cell-value img {
+.ag-cell-value img, .ag-cell-value .noIcon {
     position: relative;
     top: 4px;
 }
@@ -18,6 +18,12 @@
 
 .icon {
     width: 24px;
+}
+.noIcon {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    background: radial-gradient(ellipse at top, #68e, transparent), radial-gradient(ellipse at bottom, #843, #666);
 }
 
 .friends img {
@@ -75,11 +81,20 @@ body {
 }
 
 #cover {
-    display: block;
+    display: flex;
     margin: 10px auto;
     border: solid 1px black;
-    background: #228;
     box-shadow: 0 -30px 40px rgba(255, 255, 255, .5);
+    background: radial-gradient(ellipse at top, #68e, transparent), radial-gradient(ellipse at bottom, #843, black);
+    color: rgba(255,255,255,.7);
+    align-items: center;
+    justify-content: center;
+    font-size: 2em;
+    text-align: center;
+    text-transform: uppercase;
+    white-space: pre-wrap;
+    word-break: break-word;
+    hyphens: auto;
 }
 
 #details h1 {
@@ -104,6 +119,7 @@ body {
     min-height: 500px;
     filter: blur(20px);
     transform: scale(2);
+    background: radial-gradient(ellipse at top, #68e, transparent), radial-gradient(ellipse at left, rgba(0,255,0,.6), transparent), radial-gradient(ellipse at bottom, #f00, rgba(255,0,0,.7));
 }
 
 .catFilter {

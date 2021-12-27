@@ -87,7 +87,7 @@ const formatNum1 = (() => {
     return value => f.format(value).replace(',', "'");
 })();
 const yesNo = value => value ? 'yes' : 'no';
-const imageCell = params => params.value ? e('img', {src: params.value, class: 'icon', alt: ''}) : e('span');
+const imageCell = params => params.value ? e('img', {src: params.value, class: 'icon', alt: ''}) : e('div', {class: 'noIcon'});
 const platformsCell = ({value: v}) => e('span', {class: 'platforms'}, v.split(',')
     .map(p => e('img', {src: `res/p-${p}.svg`, alt: p})));
 const categoriesCell = params => e('span', {class: 'categories'}, params.value
@@ -204,10 +204,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     showDetails = (() => {
         return (node) => {
-            if (detailRow == node) return;
+            if (detailRow === node) return;
             detailRow = node;
             title.innerText = node.title;
             cover.src = node.cover;
+            cover.alt = node.title;
             backgroundImg.src = node.icon;
             summary.innerText = node.summary;
         }
@@ -221,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
         summary.innerText = "© Gilles Waeber 2021\n\n" +
             "Powered by: Ag-Grid Community (MIT), Luxon (MIT)\n" +
             "Game covers, icons, and summaries from GOG, game categories from Steam\n" +
-            "Platform icon sources:" +
+            "Platform icon sources: " +
             "Ionicons (https://ionic.io/ionicons): xbox, " +
             "SVGRepo (https://www.svgrepo.com): epic, generic, " +
             "Icon8 (https://icons8.com) steam, gog, uplay, origin, rockstar, battlenet\n" +
