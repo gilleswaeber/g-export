@@ -3,6 +3,8 @@ g-export
 Export a game list from GOG Galaxy as an HTML page.
 The HTML page is located in the dist folder as well as all resources (e.g. game covers).
 
+Example: https://srv.romlig.ch/games/
+
 Requirements: Python 3.7+, Python packages: pandas requests steam tqdm:
 ```sh
 python -m pip install pandas requests steam[client] tqdm
