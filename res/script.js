@@ -88,15 +88,22 @@ const formatNum1 = (() => {
 })();
 const yesNo = value => value ? 'yes' : 'no';
 const imageCell = params => params.value ? e('img', {src: params.value, class: 'icon', alt: ''}) : e('div', {class: 'noIcon'});
-const platformsCell = ({value: v}) => e('span', {class: 'platforms'}, v.split(',')
-    .map(p => e('img', {src: `res/p-${p}.svg`, alt: p})));
-const categoriesCell = params => e('span', {class: 'categories'}, params.value
-    ? CATEGORIES.map(c => e('img', {
+const platformsCell = ({value: v}) => e('span', {
+        class: 'platforms',
+        title: v.split(',').map(p => platformsInfo[p] || p).join('\n')
+    }, v.split(',')
+        .map(p => e('img', {src: `res/p-${p}.svg`, alt: p}))
+);
+const categoriesCell = ({value: v}) => v
+    ? e('span', {
+        class: 'categories',
+        title: CATEGORIES.map(c => v[c] ? `${CATEGORY_NAMES[c]}\n` : '').join('')
+    }, CATEGORIES.map(c => e('img', {
         src: `res/c-${c}.png`,
-        title: `${CATEGORY_NAMES[c]}: ${yesNo(params.value[c])}`,
-        class: yesNo(params.value[c])
-    }))
-    : []);
+        alt: `${CATEGORY_NAMES[c]}: ${yesNo(v[c])}`,
+        class: yesNo(v[c])
+    })))
+    : e('span');
 const playTimeCell = params => e('span', {class: 'playtime'}, params.value > 0 ? `${formatNum1(params.value / 60)}\u202Fh` : '')
 const lastPlayedCell = params => {
     if (!params.value) return null;
@@ -188,6 +195,8 @@ const gridOptions = {
     },
     rowData: data,
     enableCellTextSelection: true,
+    isExternalFilterPresent: () => true,
+    doesExternalFilterPass: params => !params.data.hide,
 };
 let showDetails;
 document.addEventListener('DOMContentLoaded', () => {
@@ -219,7 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
         title.innerText = "g-export";
         cover.src = 'res/logo-cover.svg';
         backgroundImg.src = 'res/logo-cover.svg';
-        summary.innerText = "© Gilles Waeber 2021\n\n" +
+        summary.innerText = "© Gilles Waeber 2022 – MIT License\n\n" +
             "Powered by: Ag-Grid Community (MIT), Luxon (MIT)\n" +
             "Game covers, icons, and summaries from GOG, game categories from Steam\n" +
             "Platform icon sources: " +
@@ -228,4 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
             "Icon8 (https://icons8.com) steam, gog, uplay, origin, rockstar, battlenet\n" +
             "Logos/covers/icons copyrighted by respective owners";
     })
+    const showIgnored = document.querySelector('#showIgnored');
+    gridOptions.isExternalFilterPresent = () => !showIgnored.checked;
+    showIgnored.addEventListener('change', () => gridOptions.api.onFilterChanged());
 });

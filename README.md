@@ -3,7 +3,10 @@ g-export
 Export a game list from GOG Galaxy as an HTML page.
 The HTML page is located in the dist folder as well as all resources (e.g. game covers).
 
-Requirements: Python 3.7+, Python packages: pandas requests steam tqdm: `pip install pandas requests steam tqdm`
+Requirements: Python 3.7+, Python packages: pandas requests steam tqdm:
+```sh
+python -m pip install pandas requests steam[client] tqdm
+```
 
 Example usage:
 ```sh
@@ -28,4 +31,4 @@ When using --friends or --all-friends, both --steam-id and --steam-api-key must 
 supported, their game collections must be public.
 ```
 
-© Gilles Waeber 2021
+© Gilles Waeber 2022

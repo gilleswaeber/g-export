@@ -16,11 +16,11 @@ import requests
 from pandas import DataFrame
 from steam.client import SteamClient  # noqa
 from steam.steamid import SteamID
-from steam.webapi import WebAPI
 from tqdm import tqdm
 
 from helpers import TmpFile, one_way_sync, read_json_gz_file, write_json_gz_file, split_chunks
-from steam_info import Category
+from platforms.steam import Category, SteamAPI
+from platforms.platforms import PLATFORMS
 
 SCRIPT_DIR = Path(__file__).parent
 DIST_DIR = SCRIPT_DIR / 'dist'
@@ -32,9 +32,6 @@ STEAM_DB_CACHE = CACHE_DIR / 'steamdb.json.gz'
 REPORT_FILE = DIST_DIR / 'index.html'
 DATA_DUMP_FILE = DIST_DIR / 'data.json.gz'
 REPO_URL = 'https://git.romlig.ch/gilles/g-export'
-KNOWN_PLATFORMS = {  # svg icon in res folder
-    'epic', 'xboxone', 'steam', 'gog', 'uplay', 'origin', 'rockstar', 'battlenet', 'generic'
-}
 
 
 class ImageCache:
@@ -144,11 +141,16 @@ def run(*, gog_db, steam_id=None, steam_api_key=None, all_friends=False, friends
         friends=list(sorted(set(f for r in row.all_releases for f in game_friends[r]))),
         steamId=row.steam_id,
         allReleases=row.all_releases,
+        hide=row.hide,
     ) for row in df.itertuples()]
     friends_dump = {row.Index: dict(
         name=row.name,
         icon=str('img' / row.icon_rel).replace('\\', '/') if row.icon else None
     ) for row in friends_info.itertuples()}
+    platforms_dump = {p.key: p.name for p in PLATFORMS.values()}
+    num_games = (df['hide'] == False).sum()
+    hidden_games = df['hide'].sum()
+    write_json_gz_file(DATA_DUMP_FILE, dict(games=games_dump, friends=friends_dump, platforms=platforms_dump))
     with TmpFile(REPORT_FILE) as r, r.open('wt', encoding='utf-8') as report:
         report.write(
             '<!DOCTYPE html>\n'
@@ -160,13 +162,14 @@ def run(*, gog_db, steam_id=None, steam_api_key=None, all_friends=False, friends
             '<script src="res/luxon.min.js"></script>\n'
             '<script>const data = '
         )
-        write_json_gz_file(DATA_DUMP_FILE, dict(games=games_dump, friends=friends_dump))
         json.dump(games_dump, report)
         report.write(f';\n')
         report.write(f'const showFriends = {"true" if friends or all_friends else "false"};\n')
         report.write(f'const friendsInfo = ')
         json.dump(friends_dump, report)
-        report.write(';')
+        report.write(';\nconst platformsInfo = ')
+        json.dump(platforms_dump, report)
+        report.write(';\n')
         report.write(
             '</script>\n'
             '<script src="res/script.js"></script>\n'
@@ -176,11 +179,13 @@ def run(*, gog_db, steam_id=None, steam_api_key=None, all_friends=False, friends
             '</head><body>\n'
             '<div id="gridContainer"><div id="myGrid" class="ag-theme-balham-dark"></div>\n'
 
-            f'<div id="exportInfo">{df.shape[0]} games – '
+            f'<div id="exportInfo">{num_games} games – '
             f'game list exported from GOG Galaxy using <a href="{REPO_URL}">g-export</a> – '
-            f'{export_time}</div></div>\n'
+            f'{export_time} – '
+            f'<input id="showIgnored" type="checkbox"/><label for="showIgnored">show {hidden_games} without activity</label>'
+            f'</div></div>\n'
 
-            '<div id="details"><div id="background"><img width=48 height=48 alt=""/></div>'
+            '<div id="details"><div id="background"><img width=48 height=48 alt=""/><div class="shadow"></div></div>'
             '<img id="cover" height=482 width=342/>'
             '<h1>My Games</h1><div id="summary"></div></div>\n'
 
@@ -235,6 +240,7 @@ ORDER BY title
         df = pandas.read_sql_query(query, con)
         df['steam_ids'] = df['steam_ids'].apply(lambda x: x.split(',') if x else [])
         df['all_releases'] = df['all_releases'].apply(lambda x: json.loads(x))
+        df['hide'] = (df['rating'] == 0) & (df['last_played'].isnull()) & (df['game_time'] == 0)
     print("done")
     return df
 
@@ -278,15 +284,9 @@ def get_friends_info(all_friends: bool, friends: Optional[Iterable[str]],
             raise ValueError('Failed to retrieve info for steam id', steam_id)
 
         print("Retrieve Steam friends list…", end=" ")
-        api = WebAPI(steam_api_key)
-        steam_friends = api.ISteamUser.GetFriendList_v1(steamid=my_id, relationship='friend')['friendslist']['friends']
-        steam_friends_info = {}
-        for chunk in split_chunks(steam_friends, 100):
-            players = api.ISteamUser.GetPlayerSummaries_v2(
-                steamids=','.join(f['steamid'] for f in chunk)
-            )['response']['players']
-            for p in players:
-                steam_friends_info[p['steamid']] = p
+        api = SteamAPI(steam_api_key)
+        steam_friends = api.get_friends(my_id)
+        steam_friends_info = api.get_player_summaries([f['steamid'] for f in steam_friends])
         if all_friends:
             my_friends = steam_friends
         else:
@@ -300,18 +300,19 @@ def get_friends_info(all_friends: bool, friends: Optional[Iterable[str]],
                               .rtrim('/') in friends_filter]
         print("done")
         for f in tqdm(my_friends, desc="Retrieve friends' game lists"):
-            resp = api.IPlayerService.GetOwnedGames(
-                steamid=f['steamid'], include_played_free_games=True, include_appinfo=False, appids_filter=[],
-                include_free_sub=True)['response']
+            resp = api.get_owned_games(f['steamid'])
             if 'games' in resp:
                 for a in resp['games']:
                     game_friends[f'steam_{a["appid"]}'].append(f'steam_{f["steamid"]}')
             else:
-                tqdm.write(steam_friends_info[f['steamid']]['personaname'], 'does not share their game collection')
+                tqdm.write(steam_friends_info[f['steamid']]['personaname'] + ' does not share their game collection')
                 steam_friends_info.pop(f['steamid'])
         friends_info.update((f'steam_{k}', dict(name=info['personaname'], icon=info['avatar'], platform='steam'))
                             for k, info in steam_friends_info.items())
-    friends_info = DataFrame.from_dict(friends_info, 'index')
+    if len(friends_info):
+        friends_info = DataFrame.from_dict(friends_info, 'index')
+    else:
+        friends_info = DataFrame(columns=['name', 'icon', 'platform'])
     return friends_info, game_friends
 
 
